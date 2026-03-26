@@ -9,7 +9,6 @@ from .serializers import (
     UserSerializer,
     RegisterSerializer,
     CustomTokenObtainPairSerializer,
-    EmailLoginSerializer
 )
 
 User = get_user_model()

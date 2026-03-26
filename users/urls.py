@@ -11,6 +11,8 @@ from .views import (
     CheckEmailView
 )
 
+app_name = 'users'
+
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
 

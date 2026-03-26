@@ -24,7 +24,7 @@ schema_view = get_schema_view(
 urlpatterns = [
     path('admin/', admin.site.urls),
 
-    path('api/users/', include('users.urls')),
+    path('api/users/', include('users.urls', namespace='users')),
     path('api/', include('habits.urls')),
     path('api/telegram/', include('telegram.urls')),
     

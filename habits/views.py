@@ -13,24 +13,32 @@ class HabitViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Пользователь видит только свои привычки"""
+        if not self.request.user.is_authenticated:
+            return Habit.objects.none()
         return Habit.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
         """При создании привязываем привычку к пользователю"""
         serializer.save(user=self.request.user)
 
-    @action(
-        detail=False,
-        methods=['get'],
-        url_path='public',
-        permission_classes=[permissions.IsAuthenticated]
-    )
-
-    def public_habits(self, request):
-        """ Список публичных привычек. Доступен всем аутентифицированным пользователям. """
-        public_habits = Habit.objects.filter(is_public=True)
+    def list(self, request, *args, **kwargs):
+        """Переопределяем list для корректной обработки пустого списка"""
+        queryset = self.filter_queryset(self.get_queryset())
 
         # Пагинация
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'], url_path='public')
+    def list_public(self, request):
+        """Список публичных привычек"""
+        public_habits = Habit.objects.filter(is_public=True)
+
         page = self.paginate_queryset(public_habits)
         if page is not None:
             serializer = self.get_serializer(page, many=True)

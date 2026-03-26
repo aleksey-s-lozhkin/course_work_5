@@ -13,7 +13,27 @@ if not SECRET_KEY:
 
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+#ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+# ==============================================
+# HOSTS CONFIGURATION - КРИТИЧЕСКИ ВАЖНО!
+# ==============================================
+# Базовые хосты для разработки и тестирования
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    'testserver',  # Для тестов Django
+]
+
+# Добавляем хосты из переменной окружения, если есть
+env_hosts = os.getenv('ALLOWED_HOSTS', '')
+if env_hosts:
+    ALLOWED_HOSTS.extend(env_hosts.split(','))
+    # Убираем дубликаты
+    ALLOWED_HOSTS = list(dict.fromkeys(ALLOWED_HOSTS))
+
+# Для отладки
+if DEBUG:
+    print(f"🔧 ALLOWED_HOSTS = {ALLOWED_HOSTS}")
 
 INSTALLED_APPS = [
     'django.contrib.admin',

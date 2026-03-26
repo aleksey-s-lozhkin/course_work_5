@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.password_validation import validate_password
 
@@ -17,39 +17,39 @@ class UserSerializer(serializers.ModelSerializer):
 
 class RegisterSerializer(serializers.ModelSerializer):
     """Сериализатор для регистрации по email"""
-    email = serializers.EmailField(required=True)
     password = serializers.CharField(
         write_only=True,
         required=True,
         validators=[validate_password]
     )
     password_confirm = serializers.CharField(write_only=True, required=True)
-    username = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = User
         fields = ('email', 'username', 'password', 'password_confirm')
 
-    def validate_email(self, value):
-        """Проверка уникальности email"""
-        if User.objects.filter(email=value).exists():
-            raise serializers.ValidationError("Пользователь с таким email уже существует")
-        return value
+    def validate(self, attrs):
+        # Проверка email на уникальность
+        if User.objects.filter(email=attrs.get('email')).exists():
+            raise serializers.ValidationError({
+                'email': 'Пользователь с таким email уже существует'
+            })
 
-    def validate(self, data):
-        """Проверка совпадения паролей"""
-        if data['password'] != data['password_confirm']:
-            raise serializers.ValidationError({"password_confirm": "Пароли не совпадают"})
+        # Проверка паролей
+        if attrs['password'] != attrs['password_confirm']:
+            raise serializers.ValidationError({
+                'password_confirm': 'Пароли не совпадают'
+            })
 
-        # Если username не указан, используем часть email
-        if not data.get('username'):
-            data['username'] = data['email'].split('@')[0]
-
-        return data
+        return attrs
 
     def create(self, validated_data):
-        """Создание пользователя"""
         validated_data.pop('password_confirm')
+
+        # Если username не указан, создаем из email
+        if not validated_data.get('username'):
+            validated_data['username'] = validated_data['email'].split('@')[0]
+
         user = User.objects.create_user(
             email=validated_data['email'],
             username=validated_data.get('username', ''),
@@ -60,8 +60,8 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 class CustomTokenObtainPairSerializer(serializers.Serializer):
     """ Кастомный сериализатор для получения JWT токена по email. """
-    email = serializers.EmailField()
-    password = serializers.CharField(write_only=True)
+    email = serializers.EmailField(required=True)
+    password = serializers.CharField(required=True, write_only=True)
 
     def validate(self, attrs):
         email = attrs.get('email')
@@ -73,9 +73,11 @@ class CustomTokenObtainPairSerializer(serializers.Serializer):
             )
 
         # Аутентификация по email
-        from django.contrib.auth import authenticate
-        user = authenticate(request=self.context.get('request'),
-                            username=email, password=password)
+        user = authenticate(
+            request=self.context.get('request'),
+            username=email,
+            password=password
+        )
 
         if not user:
             raise serializers.ValidationError(
@@ -93,11 +95,7 @@ class CustomTokenObtainPairSerializer(serializers.Serializer):
         return {
             'refresh': str(refresh),
             'access': str(refresh.access_token),
-            'user': UserSerializer(user).data
+            'user_id': user.id,
+            'email': user.email,
+            'username': user.username,
         }
-
-
-class EmailLoginSerializer(serializers.Serializer):
-    """Сериализатор для входа по email"""
-    email = serializers.EmailField()
-    password = serializers.CharField(write_only=True)

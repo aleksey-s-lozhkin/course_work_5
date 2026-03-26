@@ -1,0 +1,12 @@
+from rest_framework import serializers
+from .models import Habit
+
+
+class HabitSerializer(serializers.ModelSerializer):
+    """Сериализатор для привычек"""
+    user = serializers.ReadOnlyField(source='user.username')
+
+    class Meta:
+        model = Habit
+        fields = '__all__'
+        read_only_fields = ('user', 'created_at', 'updated_at')

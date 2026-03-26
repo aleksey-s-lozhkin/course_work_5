@@ -25,6 +25,7 @@ django-celery-beat = ">=2.9.0,<3.0.0"
 requests = ">2.31.0"
 drf-yasg = "^1.21.15"
 django-cors-headers = "^4.9.0"
+pysocks = "^1.7.1"
 
 [tool.poetry.group.lint.dependencies]
 flake8 = "^7.3.0"

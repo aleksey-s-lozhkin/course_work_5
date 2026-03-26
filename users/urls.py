@@ -8,7 +8,8 @@ from .views import (
     CustomTokenObtainPairView,
     UserProfileView,
     LogoutView,
-    CheckEmailView
+    CheckEmailView,
+    UpdateTelegramChatIdView,
 )
 
 app_name = 'users'
@@ -25,4 +26,6 @@ urlpatterns = [
     path('logout/', LogoutView.as_view(), name='logout'),
 
     path('check-email/', CheckEmailView.as_view(), name='check_email'),
+
+    path('update-chat-id/', UpdateTelegramChatIdView.as_view(), name='update-chat-id'),
 ]

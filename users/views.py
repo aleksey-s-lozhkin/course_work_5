@@ -120,3 +120,27 @@ class CheckEmailView(APIView):
             'exists': exists,
             'available': not exists
         })
+
+
+class UpdateTelegramChatIdView(APIView):
+    """ Обновление Telegram chat_id пользователя """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        chat_id = request.data.get('telegram_chat_id')
+
+        if not chat_id:
+            return Response(
+                {'error': 'telegram_chat_id обязателен'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user = request.user
+        user.telegram_chat_id = chat_id
+        user.save()
+
+        return Response({
+            'status': 'success',
+            'message': 'Telegram chat_id обновлен',
+            'telegram_chat_id': user.telegram_chat_id
+        })

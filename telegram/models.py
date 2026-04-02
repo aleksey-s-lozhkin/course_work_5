@@ -1,14 +1,12 @@
-from django.db import models
 from django.conf import settings
+from django.db import models
 
 
 class TelegramNotification(models.Model):
     """Модель для хранения истории уведомлений"""
+
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name='notifications',
-        verbose_name='Пользователь'
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notifications', verbose_name='Пользователь'
     )
     habit = models.ForeignKey(
         'habits.Habit',
@@ -16,24 +14,12 @@ class TelegramNotification(models.Model):
         related_name='notifications',
         verbose_name='Привычка',
         null=True,
-        blank=True
-    )
-    message = models.TextField(
-        verbose_name='Текст сообщения'
-    )
-    sent_at = models.DateTimeField(
-        auto_now_add=True,
-        verbose_name='Время отправки'
-    )
-    is_success = models.BooleanField(
-        default=True,
-        verbose_name='Успешно отправлено'
-    )
-    error_message = models.TextField(
         blank=True,
-        null=True,
-        verbose_name='Ошибка'
     )
+    message = models.TextField(verbose_name='Текст сообщения')
+    sent_at = models.DateTimeField(auto_now_add=True, verbose_name='Время отправки')
+    is_success = models.BooleanField(default=True, verbose_name='Успешно отправлено')
+    error_message = models.TextField(blank=True, null=True, verbose_name='Ошибка')
 
     class Meta:
         verbose_name = 'Уведомление'

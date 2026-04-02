@@ -2,8 +2,8 @@ from rest_framework import permissions
 
 
 class IsOwnerOrReadOnly(permissions.BasePermission):
-    """ Разрешение на редактирование только владельцу.
-    Для публичных привычек - только чтение. """
+    """Разрешение на редактирование только владельцу.
+    Для публичных привычек - только чтение."""
 
     def has_object_permission(self, request, view, obj):
         # Разрешаем GET, HEAD, OPTIONS запросы всем
@@ -15,7 +15,7 @@ class IsOwnerOrReadOnly(permissions.BasePermission):
 
 
 class IsPublicHabitReadOnly(permissions.BasePermission):
-    """ Для публичных привычек - только чтение. """
+    """Для публичных привычек - только чтение."""
 
     def has_permission(self, request, view):
         # Для списка публичных привычек

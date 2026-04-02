@@ -1,8 +1,8 @@
 import os
 from datetime import timedelta
 from pathlib import Path
+
 from dotenv import load_dotenv
-from celery.schedules import crontab
 
 load_dotenv()
 
@@ -14,27 +14,7 @@ if not SECRET_KEY:
 
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-#ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
-# ==============================================
-# HOSTS CONFIGURATION - КРИТИЧЕСКИ ВАЖНО!
-# ==============================================
-# Базовые хосты для разработки и тестирования
-ALLOWED_HOSTS = [
-    'localhost',
-    '127.0.0.1',
-    'testserver',  # Для тестов Django
-]
-
-# Добавляем хосты из переменной окружения, если есть
-env_hosts = os.getenv('ALLOWED_HOSTS', '')
-if env_hosts:
-    ALLOWED_HOSTS.extend(env_hosts.split(','))
-    # Убираем дубликаты
-    ALLOWED_HOSTS = list(dict.fromkeys(ALLOWED_HOSTS))
-
-# Для отладки
-if DEBUG:
-    print(f"🔧 ALLOWED_HOSTS = {ALLOWED_HOSTS}")
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -43,12 +23,10 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
     'drf_spectacular',
-
     'users',
     'habits',
     'telegram',
@@ -90,10 +68,7 @@ db_user = os.getenv('DB_USER')
 db_password = os.getenv('DB_PASSWORD')
 
 if not all([db_name, db_user, db_password]):
-    raise ValueError(
-        "Не все параметры базы данных установлены! "
-        "DB_NAME, DB_USER, DB_PASSWORD обязательны."
-    )
+    raise ValueError("Не все параметры базы данных установлены! " "DB_NAME, DB_USER, DB_PASSWORD обязательны.")
 
 DATABASES = {
     'default': {
@@ -164,7 +139,6 @@ CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000'
 CORS_ALLOW_CREDENTIALS = True
 
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
-SOCKS5_PROXY = os.getenv('SOCKS5_PROXY', None)
 
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',

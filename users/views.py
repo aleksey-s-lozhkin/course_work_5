@@ -1,21 +1,22 @@
-# users/views.py
+from django.contrib.auth import get_user_model
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import get_user_model
+from rest_framework_simplejwt.views import TokenObtainPairView
+
 from .serializers import (
-    UserSerializer,
-    RegisterSerializer,
     CustomTokenObtainPairSerializer,
+    RegisterSerializer,
+    UserSerializer,
 )
 
 User = get_user_model()
 
 
 class RegisterView(generics.CreateAPIView):
-    """ Регистрация пользователя по email. POST /api/users/register/ """
+    """Регистрация пользователя по email. POST /api/users/register/"""
+
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
@@ -28,16 +29,20 @@ class RegisterView(generics.CreateAPIView):
         # Генерируем токены
         refresh = RefreshToken.for_user(user)
 
-        return Response({
-            'user': UserSerializer(user).data,
-            'refresh': str(refresh),
-            'access': str(refresh.access_token),
-            'message': 'Регистрация успешно завершена'
-        }, status=status.HTTP_201_CREATED)
+        return Response(
+            {
+                'user': UserSerializer(user).data,
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+                'message': 'Регистрация успешно завершена',
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
-    """ Получение JWT токена по email. POST /api/users/token/ """
+    """Получение JWT токена по email. POST /api/users/token/"""
+
     serializer_class = CustomTokenObtainPairSerializer
 
     def post(self, request, *args, **kwargs):
@@ -47,13 +52,13 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             return Response(serializer.validated_data, status=status.HTTP_200_OK)
         except Exception as e:
             return Response(
-                {'error': str(e), 'detail': 'Неверный email или пароль'},
-                status=status.HTTP_401_UNAUTHORIZED
+                {'error': str(e), 'detail': 'Неверный email или пароль'}, status=status.HTTP_401_UNAUTHORIZED
             )
 
 
 class UserProfileView(generics.RetrieveUpdateAPIView):
-    """ Профиль пользователя. GET/PUT /api/users/profile/ """
+    """Профиль пользователя. GET/PUT /api/users/profile/"""
+
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -68,79 +73,60 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
         if new_email and new_email != user.email:
             if User.objects.filter(email=new_email).exists():
                 return Response(
-                    {'email': 'Пользователь с таким email уже существует'},
-                    status=status.HTTP_400_BAD_REQUEST
+                    {'email': 'Пользователь с таким email уже существует'}, status=status.HTTP_400_BAD_REQUEST
                 )
 
         return super().update(request, *args, **kwargs)
 
 
 class LogoutView(APIView):
-    """ Выход из системы (добавление refresh токена в черный список). """
+    """Выход из системы (добавление refresh токена в черный список)."""
+
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
         try:
             refresh_token = request.data.get('refresh')
             if not refresh_token:
-                return Response(
-                    {'error': 'Требуется refresh токен'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                return Response({'error': 'Требуется refresh токен'}, status=status.HTTP_400_BAD_REQUEST)
 
             token = RefreshToken(refresh_token)
             token.blacklist()
 
-            return Response(
-                {'message': 'Успешный выход из системы'},
-                status=status.HTTP_200_OK
-            )
+            return Response({'message': 'Успешный выход из системы'}, status=status.HTTP_200_OK)
         except Exception as e:
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class CheckEmailView(APIView):
-    """ Проверка существования email. """
+    """Проверка существования email."""
+
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
         email = request.data.get('email')
         if not email:
-            return Response(
-                {'error': 'Email обязателен'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({'error': 'Email обязателен'}, status=status.HTTP_400_BAD_REQUEST)
 
         exists = User.objects.filter(email=email).exists()
-        return Response({
-            'email': email,
-            'exists': exists,
-            'available': not exists
-        })
+        return Response({'email': email, 'exists': exists, 'available': not exists})
 
 
 class UpdateTelegramChatIdView(APIView):
-    """ Обновление Telegram chat_id пользователя """
+    """Обновление Telegram chat_id пользователя"""
+
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
         chat_id = request.data.get('telegram_chat_id')
 
         if not chat_id:
-            return Response(
-                {'error': 'telegram_chat_id обязателен'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({'error': 'telegram_chat_id обязателен'}, status=status.HTTP_400_BAD_REQUEST)
 
         user = request.user
         user.telegram_chat_id = chat_id
         user.save()
 
-        return Response({
-            'status': 'success',
-            'message': 'Telegram chat_id обновлен',
-            'telegram_chat_id': user.telegram_chat_id
-        })
+        return Response(
+            {'status': 'success', 'message': 'Telegram chat_id обновлен', 'telegram_chat_id': user.telegram_chat_id}
+        )

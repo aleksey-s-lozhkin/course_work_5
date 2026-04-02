@@ -1,4 +1,3 @@
-# users/models.py
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -34,23 +33,10 @@ class CustomUserManager(BaseUserManager):
 
 class User(AbstractUser):
     """Кастомная модель пользователя с email в качестве логина"""
-    username = models.CharField(
-        max_length=150,
-        unique=False,
-        blank=True,
-        null=True,
-        verbose_name='Имя пользователя'
-    )
-    email = models.EmailField(
-        unique=True,
-        verbose_name='Email'
-    )
-    telegram_chat_id = models.CharField(
-        max_length=100,
-        blank=True,
-        null=True,
-        verbose_name='Telegram Chat ID'
-    )
+
+    username = models.CharField(max_length=150, unique=False, blank=True, null=True, verbose_name='Имя пользователя')
+    email = models.EmailField(unique=True, verbose_name='Email')
+    telegram_chat_id = models.CharField(max_length=100, blank=True, null=True, verbose_name='Telegram Chat ID')
 
     USERNAME_FIELD = 'email'  # Используем email для аутентификации
     REQUIRED_FIELDS = []  # Поля, обязательные при создании суперпользователя

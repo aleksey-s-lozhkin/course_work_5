@@ -1,7 +1,7 @@
-from rest_framework import serializers
-from django.contrib.auth import get_user_model, authenticate
-from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.password_validation import validate_password
+from rest_framework import serializers
+from rest_framework_simplejwt.tokens import RefreshToken
 
 User = get_user_model()
 
@@ -17,11 +17,8 @@ class UserSerializer(serializers.ModelSerializer):
 
 class RegisterSerializer(serializers.ModelSerializer):
     """Сериализатор для регистрации по email"""
-    password = serializers.CharField(
-        write_only=True,
-        required=True,
-        validators=[validate_password]
-    )
+
+    password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
     password_confirm = serializers.CharField(write_only=True, required=True)
 
     class Meta:
@@ -31,15 +28,11 @@ class RegisterSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         # Проверка email на уникальность
         if User.objects.filter(email=attrs.get('email')).exists():
-            raise serializers.ValidationError({
-                'email': 'Пользователь с таким email уже существует'
-            })
+            raise serializers.ValidationError({'email': 'Пользователь с таким email уже существует'})
 
         # Проверка паролей
         if attrs['password'] != attrs['password_confirm']:
-            raise serializers.ValidationError({
-                'password_confirm': 'Пароли не совпадают'
-            })
+            raise serializers.ValidationError({'password_confirm': 'Пароли не совпадают'})
 
         return attrs
 
@@ -53,13 +46,14 @@ class RegisterSerializer(serializers.ModelSerializer):
         user = User.objects.create_user(
             email=validated_data['email'],
             username=validated_data.get('username', ''),
-            password=validated_data['password']
+            password=validated_data['password'],
         )
         return user
 
 
 class CustomTokenObtainPairSerializer(serializers.Serializer):
-    """ Кастомный сериализатор для получения JWT токена по email. """
+    """Кастомный сериализатор для получения JWT токена по email."""
+
     email = serializers.EmailField(required=True)
     password = serializers.CharField(required=True, write_only=True)
 
@@ -68,26 +62,16 @@ class CustomTokenObtainPairSerializer(serializers.Serializer):
         password = attrs.get('password')
 
         if not email or not password:
-            raise serializers.ValidationError(
-                "Необходимо указать email и пароль"
-            )
+            raise serializers.ValidationError("Необходимо указать email и пароль")
 
         # Аутентификация по email
-        user = authenticate(
-            request=self.context.get('request'),
-            username=email,
-            password=password
-        )
+        user = authenticate(request=self.context.get('request'), username=email, password=password)
 
         if not user:
-            raise serializers.ValidationError(
-                "Неверный email или пароль"
-            )
+            raise serializers.ValidationError("Неверный email или пароль")
 
         if not user.is_active:
-            raise serializers.ValidationError(
-                "Учетная запись неактивна"
-            )
+            raise serializers.ValidationError("Учетная запись неактивна")
 
         # Генерируем токены
         refresh = RefreshToken.for_user(user)

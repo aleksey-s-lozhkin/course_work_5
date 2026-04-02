@@ -1,13 +1,14 @@
-from rest_framework import viewsets, permissions
+from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+
 from .models import Habit
 from .serializers import HabitSerializer
-from .permissions import IsOwnerOrReadOnly, IsPublicHabitReadOnly
 
 
 class HabitViewSet(viewsets.ModelViewSet):
     """ViewSet для работы с привычками"""
+
     serializer_class = HabitSerializer
     permission_classes = [permissions.IsAuthenticated]
 

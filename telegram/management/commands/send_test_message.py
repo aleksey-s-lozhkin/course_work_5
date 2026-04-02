@@ -1,4 +1,5 @@
 from django.core.management.base import BaseCommand
+
 from telegram.utils import send_telegram_message
 
 

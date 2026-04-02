@@ -1,16 +1,16 @@
-# telegram/tasks.py
 import logging
+
 from celery import shared_task
 from django.utils import timezone
-from django.conf import settings
-from .utils import send_telegram_message, format_habit_reminder
+
+from .utils import format_habit_reminder, send_telegram_message
 
 logger = logging.getLogger(__name__)
 
 
 @shared_task
 def send_habit_reminder(habit_id):
-    """ Отправка напоминания о конкретной привычке """
+    """Отправка напоминания о конкретной привычке"""
     from habits.models import Habit
 
     try:
@@ -41,7 +41,7 @@ def send_habit_reminder(habit_id):
 
 @shared_task
 def send_habit_reminders():
-    """ Периодическая задача для отправки всех напоминаний """
+    """Периодическая задача для отправки всех напоминаний"""
     from habits.models import Habit
 
     now = timezone.now()
@@ -53,7 +53,7 @@ def send_habit_reminders():
     # Находим привычки, которые нужно выполнить сейчас
     habits = Habit.objects.filter(
         time__lte=current_time,  # Время выполнения наступило или прошло
-        is_pleasant=False  # Напоминаем только о полезных привычках
+        is_pleasant=False,  # Напоминаем только о полезных привычках
     )
 
     sent_count = 0
@@ -77,8 +77,4 @@ def send_habit_reminders():
 
     logger.info(f"Отправлено напоминаний: {sent_count}, пропущено: {skipped_count}")
 
-    return {
-        'sent': sent_count,
-        'skipped': skipped_count,
-        'total': habits.count()
-    }
+    return {'sent': sent_count, 'skipped': skipped_count, 'total': habits.count()}

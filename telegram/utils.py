@@ -1,5 +1,5 @@
-# telegram/utils.py
 import logging
+
 import requests
 from django.conf import settings
 
@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 
 def send_telegram_message(chat_id, message):
-    """ Отправка сообщения в Telegram """
+    """Отправка сообщения в Telegram"""
     if not settings.TELEGRAM_BOT_TOKEN:
         logger.error("TELEGRAM_BOT_TOKEN не настроен")
         return False
@@ -24,22 +24,8 @@ def send_telegram_message(chat_id, message):
         'parse_mode': 'HTML',
     }
 
-    # Настройка SOCKS5 прокси
-    proxies = {}
-    if settings.SOCKS5_PROXY:
-        proxies = {
-            'http': settings.SOCKS5_PROXY,
-            'https': settings.SOCKS5_PROXY,
-        }
-        logger.info(f"Используется SOCKS5 прокси: {settings.SOCKS5_PROXY}")
-
     try:
-        response = requests.post(
-            url,
-            json=payload,
-            timeout=60,
-            proxies=proxies if proxies else None
-        )
+        response = requests.post(url, json=payload, timeout=60)
         response.raise_for_status()
 
         result = response.json()
@@ -51,7 +37,7 @@ def send_telegram_message(chat_id, message):
             return False
 
     except requests.exceptions.Timeout:
-        logger.error(f"Таймаут при отправке сообщения")
+        logger.error("Таймаут при отправке сообщения")
         return False
     except requests.exceptions.ProxyError as e:
         logger.error(f"Ошибка SOCKS5 прокси: {e}")
@@ -65,8 +51,8 @@ def send_telegram_message(chat_id, message):
 
 
 def format_habit_reminder(habit):
-    """  Форматирование напоминания о привычке """
-    message = f"<b>Напоминание о привычке!</b>\n\n"
+    """Форматирование напоминания о привычке"""
+    message = "<b>Напоминание о привычке!</b>\n\n"
     message += f"<b>Действие:</b> {habit.action}\n"
     message += f"<b>Место:</b> {habit.place}\n"
     message += f"<b>Время:</b> {habit.time.strftime('%H:%M')}\n"

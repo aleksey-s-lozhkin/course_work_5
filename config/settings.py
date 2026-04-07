@@ -1,6 +1,7 @@
 import os
 from datetime import timedelta
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -22,12 +23,10 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
     'drf_spectacular',
-
     'users',
     'habits',
     'telegram',
@@ -69,10 +68,7 @@ db_user = os.getenv('DB_USER')
 db_password = os.getenv('DB_PASSWORD')
 
 if not all([db_name, db_user, db_password]):
-    raise ValueError(
-        "Не все параметры базы данных установлены! "
-        "DB_NAME, DB_USER, DB_PASSWORD обязательны."
-    )
+    raise ValueError("Не все параметры базы данных установлены! " "DB_NAME, DB_USER, DB_PASSWORD обязательны.")
 
 DATABASES = {
     'default': {
@@ -144,3 +140,24 @@ CORS_ALLOW_CREDENTIALS = True
 
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+CELERY_BROKER_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 минут
+
+# Celery Beat schedule
+CELERY_BEAT_SCHEDULE = {
+    'send_habit_reminders': {
+        'task': 'telegram.tasks.send_habit_reminders',
+        'schedule': 60.0,  # Каждую минуту
+    },
+}

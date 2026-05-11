@@ -119,10 +119,8 @@ jobs:
             PAGE_SIZE=5
             EOF
 
-            docker pull ${{ secrets.DOCKER_USERNAME }}/habit-tracker:latest
-
+            # Создаем docker-compose.yml
             cat > docker-compose.yml << 'EOF'
-            version: '3.8'
             services:
               db:
                 image: postgres:15-alpine
@@ -131,11 +129,23 @@ jobs:
                 env_file:
                   - .env
                 restart: unless-stopped
+                healthcheck:
+                  test: ["CMD-SHELL", "pg_isready -U habit_user -d habit_tracker"]
+                  interval: 10s
+                  timeout: 5s
+                  retries: 5
+
               redis:
                 image: redis:7-alpine
                 volumes:
                   - redis_data:/data
                 restart: unless-stopped
+                healthcheck:
+                  test: ["CMD", "redis-cli", "ping"]
+                  interval: 10s
+                  timeout: 5s
+                  retries: 5
+
               web:
                 image: ${{ secrets.DOCKER_USERNAME }}/habit-tracker:latest
                 ports:
@@ -143,19 +153,35 @@ jobs:
                 env_file:
                   - .env
                 depends_on:
-                  - db
-                  - redis
+                  db:
+                    condition: service_healthy
+                  redis:
+                    condition: service_healthy
                 restart: unless-stopped
+
             volumes:
               postgres_data:
               redis_data:
             EOF
 
+            # Останавливаем старые контейнеры
             docker-compose down
+
+            # Запускаем новые
             docker-compose up -d
 
-            sleep 15
+            # Ждем запуска БД
+            echo "Waiting for database to be ready..."
+            sleep 20
+
+            # Выполняем миграции
             docker-compose exec -T web python manage.py migrate --noinput
+
+            # Собираем статику
             docker-compose exec -T web python manage.py collectstatic --noinput
 
+            # Проверка статуса
+            docker-compose ps
+
+            # Чистим мусор
             docker system prune -f

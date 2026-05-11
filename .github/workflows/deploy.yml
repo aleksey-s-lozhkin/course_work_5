@@ -268,7 +268,8 @@ jobs:
             
             # Запускаем контейнеры
             docker-compose down
-            docker-compose up -d --build
+            docker-compose build --no-cache web nginx
+            docker-compose up -d
             
             sleep 20
             

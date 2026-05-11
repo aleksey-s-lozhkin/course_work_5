@@ -102,15 +102,15 @@ jobs:
                 listen 80;
                 server_name pyconstrictor.ru 31.184.253.113;
                 client_max_body_size 100M;
-
+            
                 location /static/ {
                     alias /static/;
                 }
-
+            
                 location /media/ {
                     alias /media/;
                 }
-
+            
                 location / {
                     proxy_pass http://web:8000;
                     proxy_set_header Host $host;
@@ -131,17 +131,17 @@ jobs:
             # Создаем docker-compose.yml
             cat > docker-compose.yml << 'EOF'
             version: '3.8'
-
+            
             networks:
               habit_tracker_network:
                 driver: bridge
-
+            
             volumes:
               postgres_data:
               redis_data:
               static_volume:
               media_volume:
-
+            
             services:
               db:
                 image: postgres:15-alpine
@@ -162,7 +162,7 @@ jobs:
                 restart: unless-stopped
                 networks:
                   - habit_tracker_network
-
+            
               redis:
                 image: redis:7-alpine
                 container_name: habit_tracker_redis
@@ -178,7 +178,7 @@ jobs:
                 restart: unless-stopped
                 networks:
                   - habit_tracker_network
-
+            
               web:
                 image: ${{ secrets.DOCKER_USERNAME }}/habit-tracker:latest
                 expose:
@@ -206,7 +206,7 @@ jobs:
                 restart: unless-stopped
                 networks:
                   - habit_tracker_network
-
+            
               nginx:
                 build: ./nginx
                 container_name: habit_tracker_nginx
@@ -220,7 +220,7 @@ jobs:
                 restart: unless-stopped
                 networks:
                   - habit_tracker_network
-
+            
               celery:
                 image: ${{ secrets.DOCKER_USERNAME }}/habit-tracker:latest
                 command: celery -A config worker --loglevel=info
@@ -242,7 +242,7 @@ jobs:
                 restart: unless-stopped
                 networks:
                   - habit_tracker_network
-
+            
               celery-beat:
                 image: ${{ secrets.DOCKER_USERNAME }}/habit-tracker:latest
                 command: celery -A config beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
@@ -268,14 +268,13 @@ jobs:
             
             # Запускаем контейнеры
             docker-compose down
-            docker-compose build --no-cache web nginx
+            docker-compose pull web celery celery-beat
+            docker-compose build --no-cache nginx
             docker-compose up -d
             
             sleep 20
             
-            # Создаем и применяем миграции в правильном порядке
-            docker-compose exec -T web python manage.py makemigrations users || true
-            docker-compose exec -T web python manage.py migrate users --noinput || true
+            # Миграции
             docker-compose exec -T web python manage.py migrate --noinput || true
             docker-compose exec -T web python manage.py collectstatic --noinput || true
             

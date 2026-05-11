@@ -67,7 +67,9 @@ jobs:
         run: poetry install
 
       - name: Run migrations
-        run: poetry run python manage.py migrate --noinput
+        run: |
+          poetry run python manage.py makemigrations
+          poetry run python manage.py migrate --noinput
         env:
           DB_NAME: test_db
           DB_USER: test_user
@@ -140,16 +142,49 @@ jobs:
             DB_USER=habit_user
             DB_PASSWORD=${{ secrets.DB_PASSWORD }}
             DB_HOST=db
+            DB_PORT=5432
             REDIS_URL=redis://redis:6379/0
             TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
             PAGE_SIZE=5
             EOF
 
             docker pull ${{ secrets.DOCKER_USERNAME }}/habit-tracker:latest
+
+            # Создаем docker-compose.yml на сервере
+            cat > docker-compose.yml << 'EOF'
+            version: '3.8'
+            services:
+              db:
+                image: postgres:15-alpine
+                volumes:
+                  - postgres_data:/var/lib/postgresql/data
+                env_file:
+                  - .env
+                restart: unless-stopped
+              redis:
+                image: redis:7-alpine
+                volumes:
+                  - redis_data:/data
+                restart: unless-stopped
+              web:
+                image: ${{ secrets.DOCKER_USERNAME }}/habit-tracker:latest
+                ports:
+                  - "8000:8000"
+                env_file:
+                  - .env
+                depends_on:
+                  - db
+                  - redis
+                restart: unless-stopped
+            volumes:
+              postgres_data:
+              redis_data:
+            EOF
+
             docker-compose down
             docker-compose up -d
 
-            sleep 10
+            sleep 15
             docker-compose exec -T web python manage.py migrate --noinput
             docker-compose exec -T web python manage.py collectstatic --noinput
 

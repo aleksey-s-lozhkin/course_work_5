@@ -53,9 +53,12 @@ jobs:
           SECRET_KEY: test-secret-key-12345
           DEBUG: '1'
           TELEGRAM_BOT_TOKEN: fake-token-for-ci-12345
-          # Используем SQLite вместо PostgreSQL
           DB_ENGINE: django.db.backends.sqlite3
           DB_NAME: /tmp/test_db.sqlite3
+          DB_HOST: ''
+          DB_PORT: ''
+          DB_USER: ''
+          DB_PASSWORD: ''
 
   # Docker
   docker-build:

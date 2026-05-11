@@ -66,36 +66,26 @@ jobs:
       - name: Install dependencies
         run: poetry install
 
-      - name: Run migrations (users app first)
-        run: poetry run python manage.py migrate users
+      - name: Run migrations
+        run: poetry run python manage.py migrate --noinput
         env:
           DB_NAME: test_db
           DB_USER: test_user
           DB_PASSWORD: test_pass
           DB_HOST: localhost
-          SECRET_KEY: test-secret-key
-          DEBUG: '1'
-
-      - name: Run all migrations
-        run: poetry run python manage.py migrate
-        env:
-          DB_NAME: test_db
-          DB_USER: test_user
-          DB_PASSWORD: test_pass
-          DB_HOST: localhost
-          SECRET_KEY: test-secret-key
+          SECRET_KEY: test-secret-key-12345
           DEBUG: '1'
 
       - name: Run tests
-        run: poetry run python manage.py test
+        run: poetry run python manage.py test --noinput
         env:
           DB_NAME: test_db
           DB_USER: test_user
           DB_PASSWORD: test_pass
           DB_HOST: localhost
-          SECRET_KEY: test-secret-key
+          SECRET_KEY: test-secret-key-12345
           DEBUG: '1'
-          TELEGRAM_BOT_TOKEN: fake-token-for-ci
+          TELEGRAM_BOT_TOKEN: fake-token-for-ci-12345
 
   # Docker
   docker-build:

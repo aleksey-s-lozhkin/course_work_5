@@ -1,4 +1,5 @@
-from .settings import *
+from .settings import *  # noqa: F401, F403
+
 
 # Принудительно используем SQLite для CI
 DATABASES = {

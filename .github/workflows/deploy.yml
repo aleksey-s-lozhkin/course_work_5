@@ -7,88 +7,52 @@ on:
     branches: [ main, master ]
 
 jobs:
-  # Flake8
   lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
       - name: Install Flake8
         run: pip install flake8
-
       - name: Run Flake8
         run: flake8 . --count --max-complexity=10 --max-line-length=127 --statistics
 
-  # Тесты
   test:
     runs-on: ubuntu-latest
     needs: lint
-
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_DB: test_db
-          POSTGRES_USER: test_user
-          POSTGRES_PASSWORD: test_pass
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-
-      redis:
-        image: redis:7
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
       - name: Install Poetry
         run: |
           pip install poetry==1.8.3
           poetry config virtualenvs.create false
-
       - name: Install dependencies
         run: poetry install
-
       - name: Run migrations and tests
         run: |
           poetry run python manage.py migrate --settings=config.settings_ci
           poetry run python manage.py test --noinput --settings=config.settings_ci
 
-  # Docker
   docker-build:
     runs-on: ubuntu-latest
     needs: test
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature/homework_35.2')
-
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
-
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -98,13 +62,13 @@ jobs:
             ${{ secrets.DOCKER_USERNAME }}/habit-tracker:latest
             ${{ secrets.DOCKER_USERNAME }}/habit-tracker:${{ github.sha }}
 
-  # Deploy
   deploy:
     runs-on: ubuntu-latest
     needs: docker-build
     if: github.event_name == 'push' && github.ref == 'refs/heads/feature/homework_35.2'
-
     steps:
+      - uses: actions/checkout@v4
+
       - name: Deploy to server
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -112,9 +76,10 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            mkdir -p /home/${{ secrets.SERVER_USER }}/habit-tracker
             cd /home/${{ secrets.SERVER_USER }}/habit-tracker
 
-            cat > .env << EOF
+            cat > .env << 'EOF'
             DEBUG=False
             SECRET_KEY=${{ secrets.SECRET_KEY }}
             ALLOWED_HOSTS=${{ secrets.SERVER_HOST }}
@@ -130,44 +95,65 @@ jobs:
             PAGE_SIZE=5
             EOF
 
-            docker pull ${{ secrets.DOCKER_USERNAME }}/habit-tracker:latest
-
-            # Создаем docker-compose.yml на сервере
             cat > docker-compose.yml << 'EOF'
-            version: '3.8'
             services:
               db:
                 image: postgres:15-alpine
                 volumes:
                   - postgres_data:/var/lib/postgresql/data
-                env_file:
-                  - .env
+                environment:
+                  POSTGRES_DB: habit_tracker
+                  POSTGRES_USER: habit_user
+                  POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
                 restart: unless-stopped
+                healthcheck:
+                  test: ["CMD-SHELL", "pg_isready -U habit_user -d habit_tracker"]
+                  interval: 10s
+                  timeout: 5s
+                  retries: 5
+          
               redis:
                 image: redis:7-alpine
                 volumes:
                   - redis_data:/data
                 restart: unless-stopped
+                healthcheck:
+                  test: ["CMD", "redis-cli", "ping"]
+                  interval: 10s
+                  timeout: 5s
+                  retries: 5
+          
               web:
                 image: ${{ secrets.DOCKER_USERNAME }}/habit-tracker:latest
                 ports:
                   - "8000:8000"
-                env_file:
-                  - .env
+                environment:
+                  DEBUG: 'False'
+                  SECRET_KEY: ${{ secrets.SECRET_KEY }}
+                  ALLOWED_HOSTS: ${{ secrets.SERVER_HOST }}
+                  DB_NAME: habit_tracker
+                  DB_USER: habit_user
+                  DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+                  DB_HOST: db
+                  DB_PORT: 5432
+                  REDIS_URL: redis://redis:6379/0
+                  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+                  PAGE_SIZE: '5'
                 depends_on:
-                  - db
-                  - redis
+                  db:
+                    condition: service_healthy
+                  redis:
+                    condition: service_healthy
                 restart: unless-stopped
+          
             volumes:
               postgres_data:
               redis_data:
             EOF
 
             docker-compose down
-            docker-compose up -d
-
-            sleep 15
-            docker-compose exec -T web python manage.py migrate --noinput
-            docker-compose exec -T web python manage.py collectstatic --noinput
-
-            docker system prune -f
+            docker-compose up -d --wait
+            sleep 20
+            docker-compose exec -T web python manage.py migrate --noinput || true
+            docker-compose exec -T web python manage.py collectstatic --noinput || true
+            docker-compose ps

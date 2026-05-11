@@ -186,7 +186,7 @@ jobs:
                 environment:
                   DEBUG: 'False'
                   SECRET_KEY: '${{ secrets.SECRET_KEY }}'
-                  ALLOWED_HOSTS: '${{ secrets.SERVER_HOST }}'
+                  ALLOWED_HOSTS: '${{ secrets.ALLOWED_HOSTS }}'
                   DB_NAME: habit_tracker
                   DB_USER: habit_user
                   DB_PASSWORD: '${{ secrets.DB_PASSWORD }}'

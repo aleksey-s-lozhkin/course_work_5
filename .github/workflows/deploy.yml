@@ -83,7 +83,7 @@ jobs:
             cat > .env << 'EOF'
             DEBUG=False
             SECRET_KEY='${{ secrets.SECRET_KEY }}'
-            ALLOWED_HOSTS='${{ secrets.SERVER_HOST }}'
+            ALLOWED_HOSTS='${{ secrets.ALLOWED_HOSTS }}'
             TIME_ZONE=Europe/Moscow
             LANGUAGE_CODE=ru-ru
             DB_NAME=habit_tracker

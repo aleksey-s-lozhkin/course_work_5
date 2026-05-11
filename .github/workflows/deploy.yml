@@ -271,6 +271,14 @@ jobs:
             docker-compose up -d --build
             
             sleep 20
+            
+            # Создаем и применяем миграции в правильном порядке
+            docker-compose exec -T web python manage.py makemigrations users || true
+            docker-compose exec -T web python manage.py migrate users --noinput || true
             docker-compose exec -T web python manage.py migrate --noinput || true
             docker-compose exec -T web python manage.py collectstatic --noinput || true
+            
+            # Перезапускаем celery-beat
+            docker-compose restart celery-beat
+            
             docker-compose ps

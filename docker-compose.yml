@@ -1,0 +1,136 @@
+version: '3.8'
+
+networks:
+  habit_tracker_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  static_volume:
+  media_volume:
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: habit_tracker_db
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - habit_tracker_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: habit_tracker_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - habit_tracker_network
+
+  web:
+    image: ${{ secrets.DOCKER_USERNAME }}/habit-tracker:latest
+    expose:
+      - "8000"
+    environment:
+      DEBUG: 'False'
+      SECRET_KEY: '${{ secrets.SECRET_KEY }}'
+      ALLOWED_HOSTS: '${{ secrets.SERVER_HOST }}'
+      DB_NAME: habit_tracker
+      DB_USER: habit_user
+      DB_PASSWORD: '${{ secrets.DB_PASSWORD }}'
+      DB_HOST: db
+      DB_PORT: 5432
+      REDIS_URL: redis://redis:6379/0
+      TELEGRAM_BOT_TOKEN: '${{ secrets.TELEGRAM_BOT_TOKEN }}'
+      PAGE_SIZE: '5'
+    volumes:
+      - static_volume:/app/static
+      - media_volume:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - habit_tracker_network
+
+  # Добавляем Nginx сервис
+  nginx:
+    build: ./nginx
+    container_name: habit_tracker_nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - static_volume:/static
+      - media_volume:/media
+    depends_on:
+      - web
+    restart: unless-stopped
+    networks:
+      - habit_tracker_network
+
+  celery:
+    image: ${{ secrets.DOCKER_USERNAME }}/habit-tracker:latest
+    command: celery -A config worker --loglevel=info
+    environment:
+      DEBUG: 'False'
+      SECRET_KEY: '${{ secrets.SECRET_KEY }}'
+      DB_NAME: habit_tracker
+      DB_USER: habit_user
+      DB_PASSWORD: '${{ secrets.DB_PASSWORD }}'
+      DB_HOST: db
+      DB_PORT: 5432
+      REDIS_URL: redis://redis:6379/0
+      TELEGRAM_BOT_TOKEN: '${{ secrets.TELEGRAM_BOT_TOKEN }}'
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - habit_tracker_network
+
+  celery-beat:
+    image: ${{ secrets.DOCKER_USERNAME }}/habit-tracker:latest
+    command: celery -A config beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    environment:
+      DEBUG: 'False'
+      SECRET_KEY: '${{ secrets.SECRET_KEY }}'
+      DB_NAME: habit_tracker
+      DB_USER: habit_user
+      DB_PASSWORD: '${{ secrets.DB_PASSWORD }}'
+      DB_HOST: db
+      DB_PORT: 5432
+      REDIS_URL: redis://redis:6379/0
+      TELEGRAM_BOT_TOKEN: '${{ secrets.TELEGRAM_BOT_TOKEN }}'
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - habit_tracker_network

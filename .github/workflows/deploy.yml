@@ -1,0 +1,284 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master, feature/homework_35.2 ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Flake8
+        run: pip install flake8
+      - name: Run Flake8
+        run: flake8 . --count --max-complexity=10 --max-line-length=127 --statistics
+
+  test:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Poetry
+        run: |
+          pip install poetry==1.8.3
+          poetry config virtualenvs.create false
+      - name: Install dependencies
+        run: poetry install
+      - name: Run migrations and tests
+        run: |
+          poetry run python manage.py migrate --settings=config.settings_ci
+          poetry run python manage.py test --noinput --settings=config.settings_ci
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature/homework_35.2')
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/habit-tracker:latest
+            ${{ secrets.DOCKER_USERNAME }}/habit-tracker:${{ github.sha }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: docker-build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/feature/homework_35.2'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            mkdir -p /home/${{ secrets.SERVER_USER }}/habit-tracker/nginx
+            cd /home/${{ secrets.SERVER_USER }}/habit-tracker
+            
+            # Создаем .env файл
+            cat > .env << 'EOF'
+            DEBUG=False
+            SECRET_KEY='${{ secrets.SECRET_KEY }}'
+            ALLOWED_HOSTS='${{ secrets.ALLOWED_HOSTS }}'
+            TIME_ZONE=Europe/Moscow
+            LANGUAGE_CODE=ru-ru
+            DB_NAME=habit_tracker
+            DB_USER=habit_user
+            DB_PASSWORD='${{ secrets.DB_PASSWORD }}'
+            DB_HOST=db
+            DB_PORT=5432
+            REDIS_URL=redis://redis:6379/0
+            TELEGRAM_BOT_TOKEN='${{ secrets.TELEGRAM_BOT_TOKEN }}'
+            PAGE_SIZE=5
+            EOF
+            
+            # Создаем nginx.conf
+            cat > nginx/nginx.conf << 'EOF'
+            server {
+                listen 80;
+                server_name pyconstrictor.ru 31.184.253.113;
+                client_max_body_size 100M;
+            
+                location /static/ {
+                    alias /static/;
+                }
+            
+                location /media/ {
+                    alias /media/;
+                }
+            
+                location / {
+                    proxy_pass http://web:8000;
+                    proxy_set_header Host $host;
+                    proxy_set_header X-Real-IP $remote_addr;
+                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto $scheme;
+                }
+            }
+            EOF
+            
+            # Создаем Dockerfile для Nginx
+            cat > nginx/Dockerfile << 'EOF'
+            FROM nginx:alpine
+            COPY nginx.conf /etc/nginx/conf.d/default.conf
+            EXPOSE 80
+            EOF
+            
+            # Создаем docker-compose.yml
+            cat > docker-compose.yml << 'EOF'
+            version: '3.8'
+            
+            networks:
+              habit_tracker_network:
+                driver: bridge
+            
+            volumes:
+              postgres_data:
+              redis_data:
+              static_volume:
+              media_volume:
+            
+            services:
+              db:
+                image: postgres:15-alpine
+                container_name: habit_tracker_db
+                environment:
+                  POSTGRES_DB: habit_tracker
+                  POSTGRES_USER: habit_user
+                  POSTGRES_PASSWORD: '${{ secrets.DB_PASSWORD }}'
+                ports:
+                  - "5432:5432"
+                volumes:
+                  - postgres_data:/var/lib/postgresql/data
+                healthcheck:
+                  test: ["CMD-SHELL", "pg_isready -U habit_user -d habit_tracker"]
+                  interval: 5s
+                  timeout: 3s
+                  retries: 5
+                restart: unless-stopped
+                networks:
+                  - habit_tracker_network
+            
+              redis:
+                image: redis:7-alpine
+                container_name: habit_tracker_redis
+                ports:
+                  - "6379:6379"
+                volumes:
+                  - redis_data:/data
+                healthcheck:
+                  test: ["CMD", "redis-cli", "ping"]
+                  interval: 5s
+                  timeout: 3s
+                  retries: 5
+                restart: unless-stopped
+                networks:
+                  - habit_tracker_network
+            
+              web:
+                image: ${{ secrets.DOCKER_USERNAME }}/habit-tracker:latest
+                expose:
+                  - "8000"
+                environment:
+                  DEBUG: 'False'
+                  SECRET_KEY: '${{ secrets.SECRET_KEY }}'
+                  ALLOWED_HOSTS: '${{ secrets.ALLOWED_HOSTS }}'
+                  DB_NAME: habit_tracker
+                  DB_USER: habit_user
+                  DB_PASSWORD: '${{ secrets.DB_PASSWORD }}'
+                  DB_HOST: db
+                  DB_PORT: 5432
+                  REDIS_URL: redis://redis:6379/0
+                  TELEGRAM_BOT_TOKEN: '${{ secrets.TELEGRAM_BOT_TOKEN }}'
+                  PAGE_SIZE: '5'
+                volumes:
+                  - static_volume:/app/static
+                  - media_volume:/app/media
+                depends_on:
+                  db:
+                    condition: service_healthy
+                  redis:
+                    condition: service_healthy
+                restart: unless-stopped
+                networks:
+                  - habit_tracker_network
+            
+              nginx:
+                build: ./nginx
+                container_name: habit_tracker_nginx
+                ports:
+                  - "80:80"
+                volumes:
+                  - static_volume:/static
+                  - media_volume:/media
+                depends_on:
+                  - web
+                restart: unless-stopped
+                networks:
+                  - habit_tracker_network
+            
+              celery:
+                image: ${{ secrets.DOCKER_USERNAME }}/habit-tracker:latest
+                command: celery -A config worker --loglevel=info
+                environment:
+                  DEBUG: 'False'
+                  SECRET_KEY: '${{ secrets.SECRET_KEY }}'
+                  DB_NAME: habit_tracker
+                  DB_USER: habit_user
+                  DB_PASSWORD: '${{ secrets.DB_PASSWORD }}'
+                  DB_HOST: db
+                  DB_PORT: 5432
+                  REDIS_URL: redis://redis:6379/0
+                  TELEGRAM_BOT_TOKEN: '${{ secrets.TELEGRAM_BOT_TOKEN }}'
+                depends_on:
+                  db:
+                    condition: service_healthy
+                  redis:
+                    condition: service_healthy
+                restart: unless-stopped
+                networks:
+                  - habit_tracker_network
+            
+              celery-beat:
+                image: ${{ secrets.DOCKER_USERNAME }}/habit-tracker:latest
+                command: celery -A config beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+                environment:
+                  DEBUG: 'False'
+                  SECRET_KEY: '${{ secrets.SECRET_KEY }}'
+                  DB_NAME: habit_tracker
+                  DB_USER: habit_user
+                  DB_PASSWORD: '${{ secrets.DB_PASSWORD }}'
+                  DB_HOST: db
+                  DB_PORT: 5432
+                  REDIS_URL: redis://redis:6379/0
+                  TELEGRAM_BOT_TOKEN: '${{ secrets.TELEGRAM_BOT_TOKEN }}'
+                depends_on:
+                  db:
+                    condition: service_healthy
+                  redis:
+                    condition: service_healthy
+                restart: unless-stopped
+                networks:
+                  - habit_tracker_network
+            EOF
+            
+            # Запускаем контейнеры
+            docker-compose down
+            docker-compose pull web celery celery-beat
+            docker-compose build --no-cache nginx
+            docker-compose up -d
+            
+            sleep 20
+            
+            # Миграции
+            docker-compose exec -T web python manage.py migrate --noinput || true
+            docker-compose exec -T web python manage.py collectstatic --noinput || true
+            
+            # Перезапускаем celery-beat
+            docker-compose restart celery-beat
+            
+            docker-compose ps

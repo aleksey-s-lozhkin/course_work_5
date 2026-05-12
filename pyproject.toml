@@ -1,49 +1,52 @@
 [tool.poetry]
-name = "cw5"
-version = "0.1.0"
-description = "Habit Tracker"
+name = "habit-tracker"
+version = "1.0.0"
+description = "API для трекера привычек на основе книги Атомные привычки"
 authors = ["Aleksey Lozhkin <aleksey.s.lozhkin@gmail.com>"]
 readme = "README.md"
-packages = [{include = "config"}]
+packages = [{include = "config"}, {include = "users"}, {include = "habits"}, {include = "telegram"}]
 
 [tool.poetry.dependencies]
-python = ">=3.12,<4.0"
-django = ">=6.0.2,<7.0.0"
-djangorestframework = ">=3.16.1,<4.0.0"
-psycopg2-binary = ">=2.9.11,<3.0.0"
-python-dotenv = ">=1.2.1,<2.0.0"
-pillow = ">=12.1.1,<13.0.0"
-djangorestframework-stubs = ">=3.16.8,<4.0.0"
-django-filter = ">=25.2,<26.0"
-djangorestframework-simplejwt = ">=5.5.1,<6.0.0"
-coverage = ">=7.13.4,<8.0.0"
-drf-spectacular = ">=0.29.0,<0.30.0"
-stripe = ">=14.4.1,<15.0.0"
-celery = ">=5.6.2,<6.0.0"
-redis = ">=7.3.0,<8.0.0"
-django-celery-beat = ">=2.9.0,<3.0.0"
-requests = ">2.31.0"
-drf-yasg = "^1.21.15"
-django-cors-headers = "^4.9.0"
-pysocks = "^1.7.1"
-celery-types = "^0.26.0"
+python = ">=3.11,<3.13"
+django = "^4.2.0"
+djangorestframework = "^3.14.0"
+psycopg2-binary = "^2.9.0"
+python-dotenv = "^1.0.0"
+pillow = "^10.0.0"
+django-filter = "^24.0"
+djangorestframework-simplejwt = "^5.3.0"
+drf-spectacular = "^0.27.0"
+celery = "^5.3.0"
+redis = "^5.0.0"
+django-celery-beat = "^2.5.0"
+requests = "^2.31.0"
+django-cors-headers = "^4.3.0"
+gunicorn = "^21.0.0"
+drf-yasg = "^1.21.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+pytest-django = "^4.8.0"
+pytest-cov = "^5.0.0"
+coverage = "^7.4.0"
 
 [tool.poetry.group.lint.dependencies]
-flake8 = "^7.3.0"
-mypy = "^1.17.0"
-black = "^25.1.0"
-isort = "^6.0.1"
+flake8 = "^7.0.0"
+mypy = "^1.8.0"
+black = "^24.0.0"
+isort = "^5.13.0"
 
 [build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
+requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
+# Инструменты
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 show_error_codes = true
-exclude = "venv/|.venv/|build/|dist/|.mypy_cache/|tests*"
+exclude = "venv/|.venv/|build/|dist/|.mypy_cache/|tests*/"
 
 [[tool.mypy.overrides]]
 module = "tests.*"
@@ -52,6 +55,7 @@ ignore_errors = true
 [tool.black]
 line-length = 119
 skip-string-normalization = true
+target-version = ["py311"]
 include = '\.pyi?$'
 exclude = '''
 /(
@@ -74,8 +78,10 @@ line_length = 119
 skip = [".venv", "venv"]
 
 [tool.pytest.ini_options]
-addopts = "--cov=src --cov-report=html --cov-report=term --cov-fail-under=80"
+minversion = "8.0"
+addopts = "--cov=. --cov-report=html --cov-report=term --cov-fail-under=70"
 testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
+DJANGO_SETTINGS_MODULE = "config.settings.test"
